@@ -1,0 +1,229 @@
+---
+title: "AstraSync AI/ML Contract Decision"
+output:
+  html_document:
+    theme: null
+    highlight: null
+    mathjax: null
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      dev = "png", dpi = 150, fig.align = "center")
+source("astrasync_analysis.R")
+d  <- function(x) scales::dollar(x, accuracy = 0.1)
+dk <- function(x) scales::dollar(x / 1000, accuracy = 0.1, suffix = "K")
+pc <- function(x, a = 0.1) scales::percent(x, accuracy = a)
+```
+
+```{=html}
+<script>(function(){var l=document.createElement("link");l.rel="stylesheet";l.href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap";document.head.appendChild(l);})();</script>
+<style>
+:root{--ink:#14213D;--muted:#4A5568;--rule:#DDE3EC;--panel:#F3F5F9;--a:#8A94A6;--b:#D98E04;--c:#2F5DE0;}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.6;font-variant-numeric:tabular-nums}
+.main-container,.container-fluid{max-width:none!important;padding:0!important;margin:0!important}
+h1.title,#header{display:none}
+.topbar{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 32px;display:flex;flex-wrap:wrap;gap:12px 28px;align-items:baseline}
+.topbar strong{font-size:18px;font-weight:600}
+.topbar span{color:#B9C3D6;font-size:14px}
+.topbar nav{margin-left:auto;display:flex;flex-wrap:wrap;gap:4px 20px}
+.topbar a{color:#fff;text-decoration:none;font-size:14px;border-bottom:2px solid transparent;padding-bottom:2px}
+.topbar a:hover,.topbar a:focus-visible{border-color:#9DB4FF;outline:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px 64px}
+section{padding-top:40px;scroll-margin-top:60px}
+section h2{font-size:26px;font-weight:600;margin:0 0 6px}
+section h3{font-size:18px;font-weight:600;margin:0 0 6px}
+.lede{color:var(--muted);margin:0 0 20px;max-width:72ch}
+.grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:28px;align-items:start}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.grid2e{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.summary p{font-size:17px;max-width:68ch;margin:0 0 10px}
+.score{border:1px solid var(--rule);border-radius:10px;padding:20px}
+.score h3{font-size:15px;color:var(--muted);font-weight:500}
+.row{display:grid;grid-template-columns:92px 1fr 104px;gap:12px;align-items:center;margin:12px 0}
+.row .lab{font-weight:600}
+.track{background:var(--panel);height:14px;border-radius:7px;overflow:hidden}
+.fill{height:100%;border-radius:7px}
+.row .val{text-align:right;font-weight:600}
+.note{font-size:14px;color:var(--muted);margin-top:12px}
+.rec{margin-top:16px;padding:14px 16px;border-left:4px solid var(--b);background:#FDF6E7;border-radius:0}
+.rec strong{display:block}
+.opt{border:1px solid var(--rule);border-top:5px solid var(--a);border-radius:10px;padding:18px 18px 12px}
+.opt.b{border-top-color:var(--b)} .opt.c{border-top-color:var(--c)}
+.opt .ev{font-size:28px;font-weight:600;margin:4px 0 8px}
+.opt p,.opt li{font-size:15px}
+.opt ul{padding-left:18px;margin:8px 0}
+.calc{background:var(--panel);border-radius:8px;padding:10px 12px;font-size:14px;margin:8px 0}
+table.tbl{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 4px}
+.tbl th{text-align:left;font-weight:600;border-bottom:2px solid var(--ink);padding:8px 10px}
+.tbl td{border-bottom:1px solid var(--rule);padding:8px 10px}
+.tbl td.n,.tbl th.n{text-align:right}
+.tbl tr.best td{background:#EEF2FE;font-weight:600}
+figure,.fig{margin:0}
+img{max-width:100%;height:auto;border:1px solid var(--rule);border-radius:8px}
+.cap{font-size:14px;color:var(--muted);margin:6px 0 0}
+.conclusion p{max-width:72ch}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--rule);margin-top:48px;padding-top:16px}
+@media (max-width:900px){.grid2,.grid3,.grid2e{grid-template-columns:1fr}.topbar nav{margin-left:0}.wrap{padding:0 18px 48px}}
+</style>
+<header class="topbar">
+  <strong>AstraSync contract decision</strong>
+  <span>Decision tree, simulation and sensitivity analysis</span>
+  <nav aria-label="Sections">
+    <a href="#summary">Summary</a><a href="#analysis">Analysis</a><a href="#illustration">Illustration</a><a href="#sensitivity">Sensitivity</a><a href="#conclusion">Conclusion</a>
+  </nav>
+</header>
+<div class="wrap">
+```
+
+```{r scoreboard, results="asis"}
+vals <- c(A = ev_A, B = ev_B, C = ev_C)
+mx <- max(vals); mn <- 480000
+bars <- paste0(sapply(names(vals), function(k) sprintf(
+  '<div class="row"><span class="lab">Option %s</span><div class="track"><div class="fill" style="width:%.1f%%;background:var(--%s)"></div></div><span class="val">%s</span></div>',
+  k, 100 * (vals[k] - mn) / (mx - mn) * 0.9 + 10, tolower(k), dk(vals[k]))), collapse = "")
+```
+
+<section id="summary" class="summary">
+<h2>Summary</h2>
+<div class="grid2">
+<div>
+
+AstraSync must decide how to price an 18-month AI/ML implementation after the client rejected its $160,000-per-month proposal and countered with two offers: equal payments of $152,000 (Option A), or $125,000 plus an $800,000 success bonus (Option B); refusing both sends the project to an RFP (Option C). We valued each option as the present value of AstraSync's monthly margin over its `r scales::dollar(monthly_cost)` monthly cost at a 1.5% monthly discount rate, using a decision tree and `r scales::comma(n_sim)` Monte Carlo simulations of the client's triangular savings to value the RFP gain-share. The expected values are `r d(ev_A)` for A, `r d(ev_B)` for B and `r d(ev_C)` for C, so the RFP has the highest expected value, but by only `r scales::dollar(ev_C - ev_B, accuracy = 1)` over B. That small edge comes with a `r pc(p_C_zero, 1)` chance of earning nothing, and it disappears if AstraSync's chance of winning the RFP falls below `r pc(be_pwin_C_vs_B)`. We recommend AstraSync accept Option B, which gives up less than 1% of expected value in exchange for a guaranteed contract, a much smaller spread of outcomes and a bonus that rewards the implementation success the team already expects.
+
+</div>
+<div class="score">
+<h3>Expected present value to AstraSync</h3>
+`r bars`
+<p class="note">Bars start at $480K so the small gaps are visible. The original proposal was worth `r d(pv_original)`.</p>
+<div class="rec"><strong>Recommendation: accept Option B</strong>Near-equal value to the RFP, without the 60% risk of walking away with nothing.</div>
+</div>
+</div>
+</section>
+
+<section id="analysis">
+<h2>Analysis</h2>
+<p class="lede">Each option is valued from AstraSync's side: monthly price minus the `r scales::dollar(monthly_cost)` monthly cost (1,200 hours at $100), discounted with the annuity factor AF = `r round(AF, 4)`. Single payments at month 18 are discounted with DF = `r round(DF, 4)`.</p>
+
+<div class="grid3">
+<div class="opt a">
+<h3>Option A: equal payments</h3>
+<div class="ev">`r d(ev_A)`</div>
+<p>The client pays $152,000 every month for 18 months. There is no uncertainty, so the expected value is the present value.</p>
+<div class="calc">($152,000 − $120,000) × `r round(AF, 4)` = `r d(pv_A)`</div>
+<ul><li>Guaranteed margin of $32,000 per month.</li><li>No upside if the project outperforms.</li></ul>
+</div>
+<div class="opt b">
+<h3>Option B: payments plus bonus</h3>
+<div class="ev">`r d(ev_B)`</div>
+<p>The client pays $125,000 per month and an $800,000 bonus at month 18 if the implementation beats the benchmark (probability `r p_bonus`).</p>
+<div class="calc">Margin: $5,000 × AF = `r d(pv_B_fail)`<br>Bonus: $800,000 × DF = `r d(pv_bonus)`<br>EV = `r d(pv_B_fail)` + `r p_bonus` × `r d(pv_bonus)` = `r d(ev_B)`</div>
+<ul><li>Outcomes: `r d(pv_B_success)` (70%) or `r d(pv_B_fail)` (30%).</li><li>Standard deviation about `r dk(sd_B)`.</li></ul>
+</div>
+<div class="opt c">
+<h3>Option C: RFP with gain-share</h3>
+<div class="ev">`r d(ev_C)`</div>
+<p>AstraSync bids $150,000 per month against competitors (win probability `r p_win`) and, if it wins, also receives a share of the client's savings at month 18.</p>
+<div class="calc">If won: $30,000 × AF + E[share] × DF<br>= `r d(pv_C_bid)` + `r d(mean_share)` × `r round(DF, 4)` = `r d(pv_C_win)`<br>EV = `r p_win` × `r d(pv_C_win)` = `r d(ev_C)`</div>
+<ul><li>`r pc(p_C_zero, 1)` chance of $0; best case about `r scales::dollar(results$Best_case_PV[3] / 1e6, accuracy = 0.01, suffix = "M")`.</li><li>Standard deviation about `r dk(sd_C)`.</li></ul>
+</div>
+</div>
+
+<div class="grid2" style="margin-top:28px">
+<div>
+<h3>Simulated gain-share under Option C</h3>
+
+```{r hist, fig.width=8, fig.height=4.6, out.width="100%"}
+p_hist
+```
+
+<p class="cap">Client savings follow a triangular distribution (low $3.2M, most likely $5.6M, high $12.8M). In `r pc(p_share_zero)` of runs savings fall below $4M and the share is $0. The long right tail pulls the mean (`r d(mean_share)`) above the median (`r d(median_share)`).</p>
+</div>
+<div>
+<h3>Side-by-side comparison</h3>
+
+```{r tbl, results="asis"}
+tb <- results
+rows <- paste0(sapply(seq_len(nrow(tb)), function(i) sprintf(
+  '<tr%s><td>%s</td><td class="n">%s</td><td class="n">%s</td><td class="n">%s</td></tr>',
+  ifelse(tb$Option[i] == best_option, ' class="best"', ''), tb$Option[i],
+  d(tb$Expected_PV[i]), d(tb$Worst_case_PV[i]), d(tb$Best_case_PV[i]))), collapse = "")
+cat('<table class="tbl"><thead><tr><th>Option</th><th class="n">Expected PV</th><th class="n">Worst case</th><th class="n">Best case</th></tr></thead><tbody>', rows, '</tbody></table>')
+```
+
+<p class="cap">Highlighted row has the highest expected value. Present values are in today's dollars. The three expected values sit within `r scales::dollar(ev_C - ev_A, accuracy = 1)` of each other, while their worst cases range from $0 to `r d(pv_A)`.</p>
+</div>
+</div>
+</section>
+
+<section id="illustration">
+<h2>Illustration</h2>
+<p class="lede">The square is AstraSync's decision, circles are chance events and triangles are end payoffs. Expected values roll back from right to left, and the decision node takes the option with the highest expected value.</p>
+
+```{r tree, fig.width=12, fig.height=6, out.width="100%"}
+p_tree
+```
+
+</section>
+
+<section id="sensitivity">
+<h2>Sensitivity analysis</h2>
+<p class="lede">The two inputs that matter most are the probabilities that drive the uncertain options: the chance of winning the RFP (C) and the chance of earning the bonus (B). Both are estimates, and the ranking of the options turns on each of them.</p>
+
+<div class="grid2e">
+<div>
+
+```{r s1, fig.width=7, fig.height=4.4, out.width="100%"}
+p_sens_win
+```
+
+<p class="cap">Option C's value rises by `r scales::dollar(pv_C_win / 100, accuracy = 1)` for every percentage point of win probability. It beats B only above `r pc(be_pwin_C_vs_B)` and beats A above `r pc(be_pwin_C_vs_A)`. The base case of 40% sits barely above the break-even.</p>
+</div>
+<div>
+
+```{r s2, fig.width=7, fig.height=4.4, out.width="100%"}
+p_sens_bonus
+```
+
+<p class="cap">Option B's value rises by `r scales::dollar(pv_bonus / 100, accuracy = 1)` for every percentage point of bonus probability. It beats A above `r pc(be_pbonus_B_vs_A)` and beats C above `r pc(be_pbonus_B_vs_C)`. The base case of 70% is within one point of both thresholds.</p>
+</div>
+</div>
+
+<div class="grid2" style="margin-top:24px">
+<div>
+
+```{r s3, fig.width=7, fig.height=4.4, out.width="100%"}
+p_twoway
+```
+
+</div>
+<div>
+<h3>What the sensitivity tells us</h3>
+<table class="tbl">
+<thead><tr><th>Break-even point</th><th class="n">Value</th></tr></thead>
+<tbody>
+<tr><td>P(win RFP) where C = B</td><td class="n">`r pc(be_pwin_C_vs_B)`</td></tr>
+<tr><td>P(win RFP) where C = A</td><td class="n">`r pc(be_pwin_C_vs_A)`</td></tr>
+<tr><td>P(bonus) where B = A</td><td class="n">`r pc(be_pbonus_B_vs_A)`</td></tr>
+<tr><td>P(bonus) where B = C</td><td class="n">`r pc(be_pbonus_B_vs_C)`</td></tr>
+</tbody></table>
+<p class="cap">The base case sits right on the corner where all three regions meet, so a one- or two-point change in either probability changes which option has the highest expected value. Because the expected values are effectively tied, the decision should rest on risk: B and A guarantee a contract, C does not.</p>
+</div>
+</div>
+</section>
+
+<section id="conclusion" class="conclusion">
+<h2>Conclusion</h2>
+
+By expected value alone, the RFP (Option C, `r d(ev_C)`) narrowly beats Option B (`r d(ev_B)`) and Option A (`r d(ev_A)`), and all three fall short of the original proposal (`r d(pv_original)`). The margin between them is less than 2% of their value, and the sensitivity analysis shows the ranking flips with very small changes in the win or bonus probabilities, which are themselves estimates.
+
+Risk therefore decides. Option C has a `r pc(p_C_zero, 1)` chance of producing nothing, a standard deviation of about `r dk(sd_C)`, and exposes AstraSync to competitors on a client it already serves. Option B guarantees the contract, limits the downside to `r d(pv_B_fail)`, and turns the team's confidence in a successful implementation into a 70% chance of `r d(pv_B_success)`. AstraSync should accept Option B. It should prefer the RFP only if it has strong evidence that its chance of winning is well above 40%, and should prefer Option A if it doubts the bonus probability is at least 69%.
+
+<footer>Prepared by Maud Anderson. Calculations in `astrasync_analysis.R` (R, ggplot2); `r scales::comma(n_sim)` simulations, seed 123.</footer>
+</section>
+
+```{=html}
+</div>
+```
